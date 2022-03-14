@@ -150,8 +150,10 @@ func (o *Options) run(streams genericclioptions.IOStreams) error {
 
 	w := newWriter(streams)
 	for _, cluster := range managedClusterList.Items {
-		if err := o.visit(&w, hubRestConfig, addonClient, tunnel.DialContext, cluster.Name); err != nil {
-			klog.Errorf("An error occurred when requesting: %v", err)
+		if len(o.clusters) == 0 || contains(o.clusters, cluster.Name) {
+			if err := o.visit(&w, hubRestConfig, addonClient, tunnel.DialContext, cluster.Name); err != nil {
+				klog.Errorf("An error occurred when requesting: %v", err)
+			}
 		}
 	}
 
@@ -261,7 +263,7 @@ func (o *Options) visit(
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
 		health = "Unknown"
-		klog.Errorf("Failed requesting /healthz endpoint for cluster %v", clusterName)
+		klog.Errorf("Failed requesting /healthz endpoint for cluster %v: %v", clusterName, err)
 		if strings.Contains(err.Error(), "dial timeout") {
 			latency = "<timeout>"
 		}
@@ -328,4 +330,13 @@ func (w *writer) print(clusterName, installed, available, health, latency string
 
 func (w *writer) flush() {
 	_ = w.w.Flush()
+}
+
+func contains(vs []string, target string) bool {
+	for _, v := range vs {
+		if v == target {
+			return true
+		}
+	}
+	return false
 }
